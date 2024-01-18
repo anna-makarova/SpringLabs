@@ -4,21 +4,28 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 import ru.makarova.MySecondAppSpringBoot.exception.UnsupportedCodeException;
 import ru.makarova.MySecondAppSpringBoot.exception.ValidationFailedException;
 import ru.makarova.MySecondAppSpringBoot.model.*;
+import ru.makarova.MySecondAppSpringBoot.service.ModifyRequestService;
 import ru.makarova.MySecondAppSpringBoot.service.ValidationService;
 import ru.makarova.MySecondAppSpringBoot.service.ModifyResponseService;
 import ru.makarova.MySecondAppSpringBoot.util.DateTimeUtil;
 
 import javax.validation.Valid;
+import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 
 @Slf4j
@@ -26,20 +33,21 @@ import java.util.Objects;
 public class MyController {
     private final ValidationService validationService;
     private final ModifyResponseService modifyResponseService;
+    private final List<ModifyRequestService> modifyRequestService;
 
     @Autowired
     public MyController(ValidationService validationService,
-                        @Qualifier("ModifySystemTimeResponseService") ModifyResponseService modifyResponseService) {
+                        @Qualifier("ModifySystemTimeResponseService") ModifyResponseService modifyResponseService,
+                        List<ModifyRequestService> modifyRequestService) {
         this.validationService = validationService;
         this.modifyResponseService = modifyResponseService;
+        this.modifyRequestService = modifyRequestService;
     }
 
     @PostMapping(value = "/feedback")
     public ResponseEntity<Response> feedback(@Valid @RequestBody Request request,
                                              BindingResult bindingResult) {
-
         log.info("request: {}", request);
-
         Response response = Response.builder()
                 .uid(request.getUid())
                 .operationUid(request.getOperationUid())
@@ -48,7 +56,6 @@ public class MyController {
                 .errorCode(ErrorCodes.EMPTY)
                 .errorMessage(ErrorMessages.EMPTY)
                 .build();
-
         log.info("response: {}", response);
         try {
             if (Objects.equals(request.getUid(), "123")) {
@@ -79,6 +86,8 @@ public class MyController {
         }
         modifyResponseService.modify(response);
         log.info("response: {}", response);
+
+        modifyRequestService.forEach(service -> service.modify(request));
 
         return new ResponseEntity<>(modifyResponseService.modify(response), HttpStatus.OK);
     }
